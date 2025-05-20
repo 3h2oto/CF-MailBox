@@ -1,23 +1,23 @@
 'use server'
 
-import { MongoClient } from 'mongodb'
-
-// 连接 MongoDB
-const client = new MongoClient(process.env.MONGODB_URI!)
-const db = client.db('mailbox')
-const inbox = db.collection('user')
+import { getDB, Env } from '@/app/lib/d1';
+import sha256 from 'crypto-js/sha256';
 
 export async function auth(email: string, password: string): Promise<string> {
   try {
-    const user = await inbox.findOne({
-      email,
-      password
-    }, { projection: { username: 1 } })
+    const db = getDB(process.env as any as Env);
+    const hashedPassword = sha256(password).toString();
+
+    const sql = `SELECT username FROM user WHERE email = ?1 AND password = ?2;`;
+    const user = await db.prepare(sql).bind(email, hashedPassword).first<{ username: string }>();
+
     if (!user) {
-      throw new Error('邮箱地址或密码错误')
+      throw new Error('邮箱地址或密码错误');
     }
-    return user.username as string
+    return user.username;
   } catch (err) {
-    throw new Error(err instanceof Error ? err.message : '未知错误')
+    // Log the error for server-side inspection if needed
+    // console.error("Authentication error:", err); 
+    throw new Error(err instanceof Error ? err.message : '未知错误');
   }
 }
